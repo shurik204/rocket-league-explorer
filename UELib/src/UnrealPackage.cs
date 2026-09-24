@@ -884,7 +884,12 @@ namespace UELib
                 /// 867/009:032
                 /// Requires third-party decompression and decryption
                 /// </summary>
-                [Build(867, 868, 9u, 32u)]
+                // Licensee 33 arrived with the 2026-08-05 update. It appends three
+                // int32 fields to the cooked summary and twelve bytes to each
+                // FCompressedChunkInfo entry; both are zero in the shipped packages.
+                // Licensee 34 (2026-09-23, build 260918.75141.528314) kept that
+                // layout and the generation-7 opcode table; only the range moved.
+                [Build(867, 868, 9u, 34u)]
                 [BuildEngineBranch(typeof(EngineBranchRL))]
                 RocketLeague,
 
@@ -2504,6 +2509,19 @@ namespace UELib
                     Debug.Assert(compressedChunkInfoOffset < stream.Length);
 
                     int lastBlockSize = stream.ReadInt32();
+
+                    // Licensee 33 appends three more int32 fields here. They are
+                    // zero in every shipped package seen so far; without consuming
+                    // them the name table is read twelve bytes early.
+                    if (stream.LicenseeVersion >= 33)
+                    {
+                        int unknownA = stream.ReadInt32();
+                        int unknownB = stream.ReadInt32();
+                        int unknownC = stream.ReadInt32();
+                        Debug.Assert(unknownA == 0 && unknownB == 0 && unknownC == 0,
+                            "Licensee 33 summary tail is not zero; re-check the layout");
+                    }
+
                     Debug.Assert(stream.Position == NameOffset, "There is more data before the NameTable");
                     // Data after this is encrypted
                 }

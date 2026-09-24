@@ -325,7 +325,7 @@ Every Unreal-derived game family that diverges from stock UE3 gets a class deriv
 - A `Decoder` (`IBufferDecoder`) for at-rest encryption (e.g., Huxley).
 - A `Serializer` (`IPackageSerializer`) for header/object-table serialization quirks.
 
-A branch is bound to a game by tagging the `UnrealPackage.GameBuild.BuildName` enum entry (in `UELib/src/UnrealPackage.cs`) with `[Build(...)]` (version range) and `[BuildEngineBranch(typeof(EngineBranchXxx))]`. RL is registered as `BuildName.RocketLeague` with `[Build(867, 868, 9u, 32u)]`. Other UE3 forks live as siblings under `UELib/src/Branch/UE3/` (APB, Borderlands `Willow`, DD2, GIGANTIC, HUXLEY, MOH, R6, RSS, SA2, SFX).
+A branch is bound to a game by tagging the `UnrealPackage.GameBuild.BuildName` enum entry (in `UELib/src/UnrealPackage.cs`) with `[Build(...)]` (version range) and `[BuildEngineBranch(typeof(EngineBranchXxx))]`. RL is registered as `BuildName.RocketLeague` with `[Build(867, 868, 9u, 34u)]` - the licensee bound moves with each update that bumps it (33 on 2026-08-05, 34 on 2026-09-23; see `snapshots/PACKAGE_SNAPSHOT_2026-09-23_licensee34.md`). Other UE3 forks live as siblings under `UELib/src/Branch/UE3/` (APB, Borderlands `Willow`, DD2, GIGANTIC, HUXLEY, MOH, R6, RSS, SA2, SFX).
 
 ### Tokens (the bytecode → text translation layer)
 
