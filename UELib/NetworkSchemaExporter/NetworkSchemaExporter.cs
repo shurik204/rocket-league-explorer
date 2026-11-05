@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using UELib.Core;
 using UELib.Flags;
@@ -27,11 +28,28 @@ internal static class NetworkSchemaExporter
         {
             "Ball_TA",
             "Car_TA",
+            "PRI_TA",
             "VehiclePickup_Boost_TA",
         };
 
     public static int Run(string outputPath, IEnumerable<string> packagePaths)
     {
+        outputPath = Path.GetFullPath(outputPath);
+        JsonElement? wirePackagePrefix = null;
+        JsonElement? wirePackageProfiles = null;
+        if (File.Exists(outputPath))
+        {
+            using var previous = JsonDocument.Parse(File.ReadAllText(outputPath));
+            if (previous.RootElement.TryGetProperty("wire_package_prefix", out var prefix))
+            {
+                wirePackagePrefix = prefix.Clone();
+            }
+            if (previous.RootElement.TryGetProperty("wire_package_profiles", out var profiles))
+            {
+                wirePackageProfiles = profiles.Clone();
+            }
+        }
+
         var paths = packagePaths.Select(Path.GetFullPath).ToArray();
         if (paths.Length == 0)
         {
@@ -58,8 +76,9 @@ internal static class NetworkSchemaExporter
         }
 
         // Keep only the actor class chains and matching objects needed by the
-        // external trajectory, radar, and boost-timer providers. Package
-        // generation counts still preserve exact package-map index arithmetic.
+        // external trajectory, radar, boost-timer, and client loadout-observer
+        // providers. Package generation counts still preserve exact
+        // package-map index arithmetic.
         var selectedClassPaths = SelectTrajectoryClassPaths(loadedPackages.Select(item => item.Package));
         var exportedObjectsByPath = loadedPackages
             .SelectMany(item => item.Package.Objects)
@@ -82,15 +101,17 @@ internal static class NetworkSchemaExporter
             Format = FormatName,
             Version = FormatVersion,
             GeneratedUtc = DateTimeOffset.UtcNow,
+            WirePackagePrefix = wirePackagePrefix,
+            WirePackageProfiles = wirePackageProfiles,
             Packages = packages,
         };
 
-        outputPath = Path.GetFullPath(outputPath);
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
         var options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
             WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         };
         File.WriteAllText(outputPath, JsonSerializer.Serialize(document, options));
 
@@ -182,11 +203,28 @@ internal static class NetworkSchemaExporter
         return item;
     }
 
+    /// <summary>
+    /// Product attribute classes appear on the wire as bare package-map object
+    /// references inside a loadout RPC - the class reference is the tag that
+    /// says how the attribute's payload is encoded. The decoder therefore has
+    /// to turn a net index back into a class name, and the only build-accurate
+    /// source of that mapping is this export.
+    ///
+    /// They were hardcoded as literal net indices instead, and a build that
+    /// inserted one object near the front of TAGame moved every one of them by
+    /// one, so the first attribute on the first equipped item threw and the
+    /// whole loadout RPC was discarded.
+    /// </summary>
+    private const string ProductAttributePrefix = "ProductAttribute_";
+
     private static bool IsTrajectoryNetObject(UObject item, HashSet<string> selectedClassPaths)
     {
         if (item is UClass classObject)
         {
-            return selectedClassPaths.Contains(NormalizePath(classObject.GetPath()));
+            return selectedClassPaths.Contains(NormalizePath(classObject.GetPath())) ||
+                classObject.Name.ToString().StartsWith(
+                    ProductAttributePrefix,
+                    StringComparison.Ordinal);
         }
 
         for (var objectClass = item.Class; objectClass != null; objectClass = objectClass.Super as UClass)
@@ -221,6 +259,7 @@ internal static class NetworkSchemaExporter
             PackageIndex = item.PackageIndex.Index,
             Name = item.Name.ToString(),
             Path = NormalizePath(item.GetPath()),
+            WirePackageName = WirePackageName(item.GetPath()),
             ReferencePath = item.GetReferencePath(),
             ClassName = GetObjectClassName(item),
             IsClassDefaultObject = item.ObjectFlags.HasFlag(ObjectFlag.ClassDefaultObject),
@@ -432,6 +471,13 @@ internal static class NetworkSchemaExporter
             : name;
     }
 
+    private static string WirePackageName(string path)
+    {
+        var normalized = NormalizePath(path);
+        var separator = normalized.IndexOf('.');
+        return separator < 0 ? normalized : normalized[..separator];
+    }
+
     private static string GetObjectClassName(UObject item)
     {
         return item.ImportTable != null
@@ -454,6 +500,8 @@ internal static class NetworkSchemaExporter
         public string Format { get; init; } = "";
         public int Version { get; init; }
         public DateTimeOffset GeneratedUtc { get; init; }
+        public JsonElement? WirePackagePrefix { get; init; }
+        public JsonElement? WirePackageProfiles { get; init; }
         public List<PackageSchema> Packages { get; init; } = [];
     }
 
@@ -476,6 +524,7 @@ internal static class NetworkSchemaExporter
         public int PackageIndex { get; init; }
         public string Name { get; init; } = "";
         public string Path { get; init; } = "";
+        public string WirePackageName { get; init; } = "";
         public string ReferencePath { get; init; } = "";
         public string ClassName { get; init; } = "";
         public bool IsClassDefaultObject { get; init; }
