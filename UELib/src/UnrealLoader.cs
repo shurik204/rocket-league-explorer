@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using UELib.Branch.UE3.RL;
 using UELib.Decoding;
 
 namespace UELib
@@ -22,8 +23,17 @@ namespace UELib
         public static UnrealPackage LoadPackage(string packagePath, UnrealPackage.GameBuild.BuildName buildTarget,
             FileAccess fileAccess = FileAccess.Read)
         {
+            // Rocket League packages are AES encrypted and split into zlib
+            // chunks.  Rebuild the complete uncompressed image when needed
+            // (including the truncated files produced by RLUPKTool).
+            var originalPath = packagePath;
+            if (fileAccess == FileAccess.Read)
+            {
+                RocketLeaguePackageReader.TryPreparePackage(packagePath, out packagePath);
+            }
+
             var stream = new UPackageStream(packagePath, FileMode.Open, fileAccess);
-            var package = new UnrealPackage(stream);
+            var package = new UnrealPackage(stream, originalPath);
             package.BuildTarget = buildTarget;
             package.Deserialize(stream);
             return package;

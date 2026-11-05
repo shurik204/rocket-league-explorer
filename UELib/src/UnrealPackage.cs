@@ -2712,8 +2712,18 @@ namespace UELib
         /// </summary>
         /// <param name="stream">A loaded UELib.PackageStream.</param>
         public UnrealPackage(UPackageStream stream)
+            : this(stream, null)
         {
-            _FullPackageName = stream.Name;
+        }
+
+        /// <summary>
+        /// Creates a new instance of the UELib.UnrealPackage class with a PackageStream and name.
+        /// </summary>
+        /// <param name="stream">A loaded UELib.PackageStream.</param>
+        /// <param name="fullPackageName">The logical package path; defaults to the stream path.</param>
+        public UnrealPackage(UPackageStream stream, string? fullPackageName)
+        {
+            _FullPackageName = fullPackageName ?? stream.Name;
             Stream = stream;
             Stream.PostInit(this);
 

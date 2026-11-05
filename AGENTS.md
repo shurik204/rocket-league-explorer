@@ -6,7 +6,13 @@ This file provides guidance to Codex (Codex.ai/code) when working with code in t
 
 This is the **Rocket League fork** of [UE Explorer](https://github.com/UE-Explorer/UE-Explorer) — a Windows GUI for browsing and decompiling Unreal Engine 1/2/3 packages (`.upk`, `.u`). The fork's reason to exist is that Rocket League ships heavily customized UnrealScript bytecode: licensee-modified opcode table, custom extended-native opcodes, custom variadic-array natives, etc. Most ongoing work in this repo is **adding/fixing tokens under `UELib/src/Branch/UE3/RL/`** so that RL packages decompile to readable script.
 
-RL packages are encrypted; UELib does not decrypt them. They must first be processed with [RLUPKTool](https://github.com/AltimorTASDK/RLUPKTool) before being opened.
+RL packages are AES-encrypted and zlib-chunked.  UELib now rebuilds the
+uncompressed image on open (`RocketLeaguePackageReader`), so either the
+encrypted original or a truncated RLUPKTool output can be loaded directly.
+RLUPKTool is still useful for older builds, but recent packages (see
+`snapshots/PACKAGE_SNAPSHOT_2026-11-05_primeupdate60_1.md`) keep their
+`CompressedChunks` array empty and its 2018 release only reconstructs the
+first chunk.
 
 ## ⚠️ Validation discipline (read first)
 
@@ -55,12 +61,20 @@ Copy-Item "D:\Games\rocketleague\TAGame\CookedPCConsole\TAGame.upk" `
           "C:\Users\Authority\Desktop\RE stuff\rldecrypted\absolutelynewupks\"
 # (repeat for each package)
 
-# 2. Decrypt each in place — RLUPKTool writes a new decrypted file alongside the input:
+# 2. Optional for older builds: decrypt each in place.  For current builds
+#    UELib's RocketLeaguePackageReader opens the encrypted original directly,
+#    so this step can be skipped.
 & "C:\Users\Authority\Desktop\RE stuff\rldecrypted\RLUPKTool.exe" `
   "C:\Users\Authority\Desktop\RE stuff\rldecrypted\absolutelynewupks\TAGame.upk"
 ```
 
-Then load the **decrypted** output via the uelib MCP (`mcp__uelib__load_package` with `build_target: "RocketLeague"`) and disassemble. Older fixtures under `rldecrypted\`, `rldecrypted\upkbackup\`, `rldecrypted\newupks\`, `rldecrypted\newupks2\` are from earlier RL versions and should not be used to validate work derived from a newer binary.
+Then load the encrypted original (or a complete decrypted output) via the uelib
+MCP (`mcp__uelib__load_package` with `build_target: "RocketLeague"`) and
+disassemble.  If an older RLUPKTool produced a truncated file, UELib now looks
+for the sibling `<name>_.upk` and rebuilds the missing chunks.  Older fixtures
+under `rldecrypted\`, `rldecrypted\upkbackup\`, `rldecrypted\newupks\`,
+`rldecrypted\newupks2\` are from earlier RL versions and should not be used to
+validate work derived from a newer binary.
 
 After decryption, class names in the loaded package have **no namespace prefix**: pass `Actor` to `mcp__uelib__disassemble_function` / `decompile_function`, not `Engine.Actor`. (The package summary's `path` shows `Engine_decrypted` so the qualified path would be `Engine_decrypted.Actor`, but the bare name resolves correctly.)
 
@@ -189,7 +203,9 @@ The bytecode parse and decompile pipeline has been hardened to recover from per-
 
 ## Current opcode-mapping state
 
-Three documents under `UELib/src/Branch/UE3/RL/` capture the state and methodology:
+Four documents under `UELib/src/Branch/UE3/RL/` capture the state and methodology:
+
+- **`snapshots/PACKAGE_SNAPSHOT_2026-11-05_primeupdate60_1.md`** — the current `868/34`, 13-generation package layout: where the AES-encrypted header ends, where the uncompressed image starts (`DependsOffset`), how the physical zlib chunks are laid out, and why truncated RLUPKTool output used to decompile as `class X dllbind()`. Read this when the package layout changes again.
 
 - **`snapshots/GNATIVES_SNAPSHOT_v868.md`** — full per-byte handler-address table for the current build. **Read this first when porting to a new RL version.** It lists every primary opcode 0x00..0x6F with its binary handler address, observed wire format, and current token mapping. The "Cross-version comparison procedure" section at the bottom describes how to recompute the byte→token map for a new build by matching handler addresses (which represent fixed semantics) rather than re-reverse-engineering each handler.
 - **`RL_OPCODE_ANALYSIS.md`** — working note with session-by-session changelog, what was tried, what worked, decompile-side improvements, and remaining issues. Read this for context on *why* a mapping is what it is.

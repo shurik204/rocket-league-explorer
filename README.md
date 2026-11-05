@@ -48,6 +48,14 @@ It has support for:
 
 *UE2X and UE4/5 have not been supported as of yet*
 
+## Opening Rocket League packages
+
+Recent Rocket League packages are AES-encrypted and split into zlib chunks.
+UE Explorer rebuilds the uncompressed image automatically, so the original
+`TAGame.upk` / `Engine.upk` files can be opened directly.  If you have an old
+RLUPKTool output, UE Explorer will detect that it is truncated and rebuild the
+missing chunks from the sibling `<name>_.upk` encrypted original.
+
 However many games may have modified the engine to some extent.
 
 A list of games that have been confirmed to work with the base version can be viewed [here](https://github.com/EliotVU/Unreal-Library).

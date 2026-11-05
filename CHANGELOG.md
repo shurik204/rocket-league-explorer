@@ -1,5 +1,16 @@
 #
 
+## 1.6.2
+
+* Rocket League: support the `868/34` Prime Update 60.1 packages (13
+  generations).
+* Load Rocket League packages directly from their AES-encrypted/zlib-chunked
+  originals; UELib rebuilds the uncompressed image on open.
+* Detect truncated RLUPKTool output and rebuild it from the sibling
+  `<name>_.upk` encrypted original.
+* Fixed classes decompiling as `class X dllbind()` when their object data was
+  missing; empty DLL bind names are no longer rendered.
+
 ## 1.6.1
 
 * Fixed #93; DPI issues.

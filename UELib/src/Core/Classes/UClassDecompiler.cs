@@ -375,10 +375,13 @@ namespace UELib.Core
                     output += "\r\n\tforcescriptorder(false)";
             }
 
-            if (DLLBindName != null
-                && string.Compare(DLLBindName, "None", StringComparison.OrdinalIgnoreCase) != 0)
+            // Empty names show up when an export's serialized data was missing
+            // (e.g. a truncated Rocket League package); don't render `dllbind()`.
+            var dllBindName = DLLBindName?.ToString();
+            if (!string.IsNullOrEmpty(dllBindName) &&
+                string.Compare(dllBindName, "None", StringComparison.OrdinalIgnoreCase) != 0)
             {
-                output += $"\r\n\tdllbind({DLLBindName})";
+                output += $"\r\n\tdllbind({dllBindName})";
             }
 
             //if (ClassDependencies != null) foreach (var dependency in ClassDependencies)
