@@ -10,6 +10,11 @@
   `<name>_.upk` encrypted original.
 * Fixed classes decompiling as `class X dllbind()` when their object data was
   missing; empty DLL bind names are no longer rendered.
+* Added `uelib-export`, a headless CLI that decompiles a package to one `.uc`
+  file per class — no GUI, and Rocket League packages can be passed as the
+  encrypted originals.
+* Releases now ship self-contained single-file binaries for `uelib-export` and
+  for the MCP server, for Windows x64, Linux x64 and macOS arm64.
 
 ## 1.6.1
 
