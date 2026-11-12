@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <RootNamespace>UELib.ExportCli</RootNamespace>
+    <AssemblyName>uelib-export</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Platforms>AnyCPU</Platforms>
+    <!-- Keep the publish folder to exactly one file. -->
+    <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
+  </PropertyGroup>
+
+  <!--
+    `dotnet publish UELib/ExportCli/Eliot.UELib.ExportCli.csproj -c Release -r linux-x64`
+    (or win-x64 / osx-arm64 / ...) produces a single self-contained binary with
+    the runtime and every dependency bundled inside the executable.
+  -->
+  <PropertyGroup Condition="'$(RuntimeIdentifier)' != ''">
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <!--
+    Eliot.UELib is strong-name signed with SHA-1. On Linux/macOS with OpenSSL 3
+    Roslyn's signing step fails with "invalid digest", so build the library
+    unsigned for the CLI on those platforms. The CLI is never strong-name
+    referenced, so this only affects the local build output.
+  -->
+  <ItemGroup Condition="'$(OS)' != 'Windows_NT'">
+    <ProjectReference Include="..\src\Eliot.UELib.csproj" AdditionalProperties="SignAssembly=false" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
+    <ProjectReference Include="..\src\Eliot.UELib.csproj" />
+  </ItemGroup>
+
+  <!--
+    Eliot.UELib ships an app.config (legacy .NET Framework binding redirects)
+    which is copied next to the CLI. It is meaningless for a self-contained
+    .NET 9 binary, so drop it from the publish folder.
+  -->
+  <Target Name="TrimPublishFolder" AfterTargets="Publish">
+    <Delete Files="$(PublishDir)Eliot.UELib.dll.config;$(PublishDir)Eliot.UELib.xml" />
+  </Target>
+</Project>

@@ -280,6 +280,8 @@ When investigating a byte that the decompiler outputs garbage for:
 | `Eliot.UELib.Benchmark`                | BenchmarkDotNet perf tests for library.                                           | `net8/9`                             |
 | `Eliot.UELib.MCP` (`UELib/MCP/`)       | Model Context Protocol stdio server wrapping the library — exposes 16 tools (load_package, list_classes, decompile_*, disassemble_function, etc.) so AI agents (Claude Code, Cursor, …) can inspect/decompile RL packages programmatically. See `UELib/MCP/README.md`. | `net9.0` |
 | `Eliot.UELib.MCP.Test` (`UELib/MCP.Test/`) | MSTest tests for the MCP project. Reuses TestUC2/TestUC3 fixtures from `UELib/Test/upk/` (no RL fixture in-tree).      | `net9.0`                             |
+| `Eliot.UELib.CLI` (`UELib/CLI/`)       | Legacy interactive object inspector for a single package (`obj` REPL: list, get, index, decompile). | `net8.0` |
+| `Eliot.UELib.ExportCli` (`UELib/ExportCli/`) | Headless bulk decompiler: pass a package, get one `.uc` file per class. Publishes as a single self-contained binary (`dotnet publish ... -r <rid>`). See `UELib/ExportCli/README.md`. | `net9.0` |
 | `Eliot.Extensions.ExecGenerator`       | Optional plugin that generates UnrealScript `exec` glue. Loaded by the GUI.       | `net48`                              |
 | `Eliot.Extensions.NTLGenerator`        | Plugin that generates Native Tables List (`.NTL`) files.                          | `net48`                              |
 | `Eliot.Utilities`                      | Small shared helpers (string ext, log manager) used by the GUI.                   | classlib                             |
@@ -320,6 +322,12 @@ dotnet publish UELib/MCP/Eliot.UELib.MCP.csproj `
     -c Release -r win-x64 `
     -p:PublishSingleFile=true --self-contained true `
     -o UELib/MCP/publish
+```
+
+```pwsh
+# Publish the headless CLI as a single self-contained binary (one file, no runtime needed)
+dotnet publish UELib/ExportCli/Eliot.UELib.ExportCli.csproj -c Release -r win-x64   # or linux-x64 / osx-arm64
+# Usage: uelib-export <package.upk> [-o <outdir>] [--filter <text>] [--tree] [--clean -q]
 ```
 
 The `Setup` installer project requires Visual Studio with the "Microsoft Visual Studio Installer Projects" extension and is **not** built by `dotnet build` — skip it for everyday work.
