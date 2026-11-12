@@ -4,9 +4,14 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - '^[0-9]+\.[0-9]+\.[0-9]+$'
+      - '[0-9]*.[0-9]*.[0-9]*'
   pull_request:
     branches: [ "UE-Explorer" ]
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
 jobs:
   build:
@@ -34,3 +39,147 @@ jobs:
       with:
         name: UE-Explorer-Win-x86
         path: "UE Explorer\\bin\\Release\\net48\\"
+
+  publish-tools:
+    name: Publish ${{ matrix.asset }}
+
+    runs-on: windows-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - asset: uelib-export-win-x64.exe
+          project: UELib/ExportCli/Eliot.UELib.ExportCli.csproj
+          rid: win-x64
+          binary: uelib-export.exe
+        - asset: uelib-export-linux-x64
+          project: UELib/ExportCli/Eliot.UELib.ExportCli.csproj
+          rid: linux-x64
+          binary: uelib-export
+        - asset: uelib-export-osx-arm64
+          project: UELib/ExportCli/Eliot.UELib.ExportCli.csproj
+          rid: osx-arm64
+          binary: uelib-export
+        - asset: uelib-mcp-win-x64.exe
+          project: UELib/MCP/Eliot.UELib.MCP.csproj
+          rid: win-x64
+          binary: Eliot.UELib.MCP.exe
+        - asset: uelib-mcp-linux-x64
+          project: UELib/MCP/Eliot.UELib.MCP.csproj
+          rid: linux-x64
+          binary: Eliot.UELib.MCP
+        - asset: uelib-mcp-osx-arm64
+          project: UELib/MCP/Eliot.UELib.MCP.csproj
+          rid: osx-arm64
+          binary: Eliot.UELib.MCP
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: 'true'
+
+    - name: Setup .NET SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ matrix.rid }}-${{ hashFiles('**/*.csproj') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-${{ matrix.rid }}-
+          ${{ runner.os }}-nuget-
+
+    # -r implies SelfContained/PublishSingleFile for ExportCli, but the MCP
+    # project has no publish properties, so pass the flags explicitly for both.
+    - name: Publish self-contained single-file binary
+      run: >
+        dotnet publish ${{ matrix.project }}
+        -c Release
+        -r ${{ matrix.rid }}
+        --self-contained true
+        -p:PublishSingleFile=true
+        -p:IncludeNativeLibrariesForSelfExtract=true
+        -p:DebugType=none
+        -o publish
+
+    # The publish folder can also hold a legacy Eliot.UELib.dll.config, XML
+    # docs, and a .pdb; stage just the executable so release assets stay clean.
+    - name: Stage binary
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path staged | Out-Null
+        $binary = Join-Path publish "${{ matrix.binary }}"
+        if (-not (Test-Path $binary)) { throw "Expected binary not found: $binary" }
+        Copy-Item $binary "staged/${{ matrix.asset }}"
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.asset }}
+        path: staged/${{ matrix.asset }}
+        if-no-files-found: error
+
+  release:
+    name: Publish release assets
+
+    needs: [ build, publish-tools ]
+    if: startsWith(github.ref, 'refs/tags/')
+
+    runs-on: ubuntu-latest
+
+    # downloads the artifacts from the other jobs (actions: read) and creates
+    # the release (contents: write).
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: release-assets
+        merge-multiple: true
+
+    - name: List release assets
+      run: ls -l release-assets
+
+    - name: Create or update release
+      uses: softprops/action-gh-release@v2
+      with:
+        files: release-assets/*
+        fail_on_unmatched_files: true
+        draft: false
+        prerelease: false
+        body: |
+          Self-contained single-file builds for tag `${{ github.ref_name }}` — no .NET runtime required.
+
+          | Asset | Platform | Tool |
+          | --- | --- | --- |
+          | `uelib-export-win-x64.exe` | Windows x64 | `uelib-export` headless decompiler |
+          | `uelib-export-linux-x64` | Linux x64 | `uelib-export` headless decompiler |
+          | `uelib-export-osx-arm64` | macOS (Apple silicon) | `uelib-export` headless decompiler |
+          | `uelib-mcp-win-x64.exe` | Windows x64 | `uelib` MCP stdio server |
+          | `uelib-mcp-linux-x64` | Linux x64 | `uelib` MCP stdio server |
+          | `uelib-mcp-osx-arm64` | macOS (Apple silicon) | `uelib` MCP stdio server |
+
+          ```sh
+          # Decompile a package (Rocket League .upk files can be passed encrypted)
+          uelib-export TAGame.upk -o ./TAGame_decompiled
+          ```
+
+          ```json
+          {
+            "mcpServers": {
+              "uelib": { "command": "/path/to/uelib-mcp-linux-x64", "args": [] }
+            }
+          }
+          ```
+
+          **Linux / macOS:** GitHub does not preserve the executable bit, so run
+          `chmod +x <asset>` after downloading. The macOS builds are not code-signed
+          or notarized — if Gatekeeper blocks them, run
+          `xattr -d com.apple.quarantine <asset>`.

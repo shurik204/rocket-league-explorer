@@ -77,6 +77,9 @@ dotnet publish UELib/MCP/Eliot.UELib.MCP.csproj `
 The published binary lands at `UELib/MCP/publish/Eliot.UELib.MCP.exe`. It
 ships the .NET 9 runtime — your machine does not need .NET installed.
 
+Prebuilt binaries for `win-x64`, `linux-x64` and `osx-arm64` are attached to the
+GitHub releases (`uelib-mcp-<platform>`), built by CI on every version tag.
+
 ## Register with Claude Code
 
 Add this entry to `%USERPROFILE%\.claude\settings.json` under
