@@ -143,6 +143,9 @@ jobs:
     - name: Download artifacts
       uses: actions/download-artifact@v4
       with:
+        # Only the self-contained tool binaries belong on the release; the
+        # GUI build artifact stays available on the workflow run page.
+        pattern: uelib-*
         path: release-assets
         merge-multiple: true
 
